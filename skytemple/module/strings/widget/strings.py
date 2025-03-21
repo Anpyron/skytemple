@@ -184,34 +184,49 @@ class StStringsStringsPage(Gtk.Box):
                 display_error(sys.exc_info(), str(err), _("Error importing the strings."))
 
     @Gtk.Template.Callback()
-    def on_btn_export_clicked(self, *args):
-        md = SkyTempleMessageDialog(
-            MainController.window(),
-            Gtk.DialogFlags.MODAL,
-            Gtk.MessageType.INFO,
-            Gtk.ButtonsType.OK,
-            _(
-                'Export is done to a CSV file with the following specifications:\n- Contains all strings in order, one per row\n- Strings may be quoted with: " and escaped with double quotes.'
-            ),
-        )
-        md.run()
-        md.destroy()
-        save_diag = Gtk.FileChooserNative.new(
-            _("Export strings as..."),
-            MainController.window(),
-            Gtk.FileChooserAction.SAVE,
-            None,
-            None,
-        )
-        add_dialog_csv_filter(save_diag)
-        response = save_diag.run()
-        fn = save_diag.get_filename()
-        save_diag.destroy()
-        if response == Gtk.ResponseType.ACCEPT and fn is not None:
-            fn = add_extension_if_missing(fn, "csv")
-            with open_utf8(fn, "w", newline="") as result_file:
-                wr = csv.writer(result_file, lineterminator="\n")
-                wr.writerows([[x.replace("\n", "\\n")] for x in self._str.strings])
+def on_btn_export_clicked(self, *args):
+    md = SkyTempleMessageDialog(
+        MainController.window(),
+        Gtk.DialogFlags.MODAL,
+        Gtk.MessageType.INFO,
+        Gtk.ButtonsType.OK,
+        _(
+            'Export is done to a CSV file with the following specifications:\n- Contains all strings in order, one per row\n- Strings may be quoted with: " and escaped with double quotes.'
+        ),
+    )
+    md.run()
+    md.destroy()
+    save_diag = Gtk.FileChooserNative.new(
+        _("Export strings as..."),
+        MainController.window(),
+        Gtk.FileChooserAction.SAVE,
+        None,
+        None,
+    )
+    add_dialog_csv_filter(save_diag)
+    response = save_diag.run()
+    fn = save_diag.get_filename()
+    save_diag.destroy()
+    if response == Gtk.ResponseType.ACCEPT and fn is not None:
+        fn = add_extension_if_missing(fn, "csv")
+        with open_utf8(fn, "w", newline="") as result_file:
+            wr = csv.writer(result_file, lineterminator="\n")
+            # Kategorien sammeln (inkl. Platzhalter)
+            categories = list(self._collect_categories())
+            # Zeilen mit ID, String und Kategorie erstellen
+            rows = []
+            for idx, x in enumerate(self._str.strings):
+                category_name = ""
+                for cat in categories:
+                    if cat.begin <= idx < cat.end:
+                        category_name = cat.name_localized
+                        break  # Kategorie gefunden, Schleife verlassen
+                rows.append([
+                    idx + 1,  # ID (Zeilenindex + 1)
+                    x.replace("\n", "\\n"),  # String mit escaped Newlines
+                    category_name  # Name der Kategorie
+                ])
+            wr.writerows(rows)
 
     def _visibility_func(self, model, iter, *args):
         if self._active_category is not None:
